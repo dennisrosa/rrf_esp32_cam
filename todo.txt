@@ -1,0 +1,12 @@
+
+List of features
+
+
+1- create ou read config.txt on sd card with wifi information , time zone and rrf board address
+2- config wifi with config.txt information
+3- config ntp service for handle time based on gmt
+4- read information on rrf board endpoint
+5- verify state of printer iddle, printing, failed
+6- when start a print create a new directory with date + name of gcode
+7- read layer information for take picture on each layer
+8- take picture and save on sdcard
