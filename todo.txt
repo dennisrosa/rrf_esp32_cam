@@ -10,3 +10,8 @@ List of features
 6- when start a print create a new directory with date + name of gcode
 7- read layer information for take picture on each layer
 8- take picture and save on sdcard
+
+
+nexts probaly features
+generate a simple page for view data 
+maybe generate gif from images try that js library https://github.com/yahoo/gifshot
