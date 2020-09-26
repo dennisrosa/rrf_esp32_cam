@@ -15,3 +15,45 @@ List of features
 nexts probaly features
 generate a simple page for view data 
 maybe generate gif from images try that js library https://github.com/yahoo/gifshot
+
+
+
+[definition]
+endpoint = http://192.168.1.31/rr_model?key=job
+method = get
+payload =
+{
+	"key": "job",
+	"flags": "",
+	"result": {
+		"build": {
+			"currentObject": -1,
+			"m486Names": false,
+			"m486Numbers": false,
+			"objects": []
+		},
+		"duration": 12,
+		"file": {
+			"filament": [],
+			"fileName": "0:/gcodes/teste.gcode",
+			"firstLayerHeight": 0.15,
+			"height": 20.6,
+			"lastModified": "2020-09-10T22:21:22",
+			"layerHeight": 0,
+			"numLayers": 0,
+			"size": 98087
+		},
+		"filePosition": 40,
+		"firstLayerDuration": 0,
+		"lastFileName": "0:/gcodes/teste.gcode",
+		"layer": 0,
+		"layerTime": 0,
+		"timesLeft": {},
+		"warmUpDuration": 12
+	}
+}
+
+Search keys
+
+[result][file][fileName]
+[result][layer]
