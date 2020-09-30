@@ -324,8 +324,21 @@ void readDuet(){
 // Send request
 http.useHTTP10(true);
 http.begin("http://arduinojson.org/example.json");
-http.GET();
-
+// Send HTTP GET request
+      int httpResponseCode = http.GET();
+      
+      if (httpResponseCode>0) {
+        Serial.print("HTTP Response code: ");
+        Serial.println(httpResponseCode);
+        String payload = http.getString();
+        Serial.println(payload);
+      }
+      else {
+        Serial.print("Error code: ");
+        Serial.println(httpResponseCode);
+      }
+  
+  
 // Parse response
 DynamicJsonDocument doc(2048);
 deserializeJson(doc, http.getStream());
