@@ -28,6 +28,16 @@
 #include <ArduinoJson.h>
 #include <HTTPClient.h>
 
+
+typedef struct StatusDuet
+{
+    int layer;
+    String status;
+    String folder;
+} StatusDuet;
+ 
+StatusDuet status;
+
 //Replace with your network credentials
 String ssid = "Corona Virus";
 String password = "orlando21";
@@ -64,8 +74,8 @@ static const char *_STREAM_CONTENT_TYPE = "multipart/x-mixed-replace;boundary=" 
 static const char *_STREAM_BOUNDARY = "\r\n--" PART_BOUNDARY "\r\n";
 static const char *_STREAM_PART = "Content-Type: image/jpeg\r\nContent-Length: %u\r\n\r\n";
 
-unsigned long miliseconds = 0;  
-const long interval = 1000; 
+unsigned long miliseconds = 0;
+const long interval = 1000;
 
 httpd_handle_t stream_httpd = NULL;
 
@@ -166,18 +176,20 @@ void startCameraServer()
 
 String getValue(String data, char separator, int index)
 {
-    int found = 0;
-    int strIndex[] = { 0, -1 };
-    int maxIndex = data.length() - 1;
+  int found = 0;
+  int strIndex[] = {0, -1};
+  int maxIndex = data.length() - 1;
 
-    for (int i = 0; i <= maxIndex && found <= index; i++) {
-        if (data.charAt(i) == separator || i == maxIndex) {
-            found++;
-            strIndex[0] = strIndex[1] + 1;
-            strIndex[1] = (i == maxIndex) ? i+1 : i;
-        }
+  for (int i = 0; i <= maxIndex && found <= index; i++)
+  {
+    if (data.charAt(i) == separator || i == maxIndex)
+    {
+      found++;
+      strIndex[0] = strIndex[1] + 1;
+      strIndex[1] = (i == maxIndex) ? i + 1 : i;
     }
-    return found > index ? data.substring(strIndex[0], strIndex[1]) : "";
+  }
+  return found > index ? data.substring(strIndex[0], strIndex[1]) : "";
 }
 
 void configure()
@@ -224,25 +236,24 @@ void configure()
     }
     file.close();
     return;
-
-  }else{
+  }
+  else
+  {
     Serial.println("Arquivo encontrado lendo os dados ");
 
-    while (file.available()) {
-      String ssidString=file.readStringUntil('\n');
-      ssid= getValue(ssidString, '=', 1);
-      String passwordString=file.readStringUntil('\n');
-      password= getValue(passwordString, '=', 1);
+    while (file.available())
+    {
+      String ssidString = file.readStringUntil('\n');
+      ssid = getValue(ssidString, '=', 1);
+      String passwordString = file.readStringUntil('\n');
+      password = getValue(passwordString, '=', 1);
       printer = getValue(file.readStringUntil('\n'), '=', 1);
-
 
       Serial.println("ssidString:" + ssid);
       Serial.println("passwordString:" + password);
       Serial.println("printer:" + printer);
     }
-
-}
-
+  }
 
   // Wi-Fi connection
   WiFi.begin(ssid.c_str(), password.c_str());
@@ -313,28 +324,62 @@ void setup()
   startCameraServer();
 }
 
-void readDuet(){
-  Serial.println("executa duet" );
 
-
-  
+DynamicJsonDocument getHttp(String url){
 
   HTTPClient http;
 
-// Send request
-http.useHTTP10(true);
-http.begin("http://arduinojson.org/example.json");
-http.GET();
+  // Send request
+  http.useHTTP10(true);
+  Serial.println("url:" + url);
+  http.begin(url);
+  http.GET();
 
-// Parse response
-DynamicJsonDocument doc(2048);
-deserializeJson(doc, http.getStream());
+  // Parse response
+  DynamicJsonDocument doc(2048);
+  deserializeJson(doc, http.getStream());
 
-// Read values
-Serial.println(doc["time"].as<long>());
+  // Read values
+  //serializeJson(doc, Serial);
 
-// Disconnect
-http.end();
+
+  // Disconnect
+  http.end();
+
+  return doc;
+}
+
+
+void getHttpStatus(){
+
+  ///rr_model?flags=d99fn
+  ///rr_model?key=job
+
+  String url = "http://" + printer ;
+  DynamicJsonDocument doc(2048);
+
+  url +=  "/rr_status?type=3";
+  doc = getHttp(url);
+
+  String state = doc["status"];
+  Serial.println("retorno:"+ state);
+  
+  String inputs = doc["currentLayer"];
+  Serial.println("retorno1:"+ inputs);
+
+      //serializeJson(doc, Serial);
+
+
+
+
+}
+
+
+void readDuet()
+{
+  Serial.println("executa duet");
+  getHttpStatus();
+  
 }
 
 void loop()
@@ -342,11 +387,10 @@ void loop()
   delay(1);
 
   unsigned long currentMillis = millis();
-  if (currentMillis - miliseconds >= interval) {
+  if (currentMillis - miliseconds >= interval)
+  {
     // save the last time you blinked the LED
     miliseconds = currentMillis;
     readDuet();
-  
   }
-
 }
