@@ -27,7 +27,10 @@
 #include "SD_MMC.h" // SD Card ESP32
 #include <ArduinoJson.h>
 #include <HTTPClient.h>
+#include <time.h>
 
+
+struct tm timeinfo;
 
 typedef struct StatusDuet
 {
@@ -36,7 +39,11 @@ typedef struct StatusDuet
     String folder;
 } StatusDuet;
  
-StatusDuet status;
+StatusDuet statusDuet;
+
+const char* ntpServer = "0.br.pool.ntp.org";
+const long gmtOffset_sec = -3;
+const int daylightOffset_sec = 3600;
 
 //Replace with your network credentials
 String ssid = "Corona Virus";
@@ -78,6 +85,10 @@ unsigned long miliseconds = 0;
 const long interval = 1000;
 
 httpd_handle_t stream_httpd = NULL;
+
+
+
+
 
 static esp_err_t stream_handler(httpd_req_t *req)
 {
@@ -322,6 +333,7 @@ void setup()
   configure();
   // Start streaming web server
   startCameraServer();
+  configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
 }
 
 
@@ -331,28 +343,52 @@ DynamicJsonDocument getHttp(String url){
 
   // Send request
   http.useHTTP10(true);
-  Serial.println("url:" + url);
   http.begin(url);
-  http.GET();
-
-  // Parse response
+  http.setTimeout(2000);
+  Serial.println("url: " + url);
+  
   DynamicJsonDocument doc(2048);
-  deserializeJson(doc, http.getStream());
 
-  // Read values
-  //serializeJson(doc, Serial);
-
-
+  // Send HTTP GET request
+  int httpResponseCode = http.GET();
+  
+  if (httpResponseCode>0) {
+    Serial.print("HTTP Response code: ");
+    Serial.println(httpResponseCode);
+    deserializeJson(doc, http.getStream());
+  }
+  else {
+    Serial.print("Error code: ");
+    Serial.println(httpResponseCode);
+  }
   // Disconnect
   http.end();
-
   return doc;
 }
 
+String getDate(){
+  if(!getLocalTime(&timeinfo)){
+    Serial.println("Failed to obtain time");
+    return "";
+  }
+
+  char now[120];
+  strftime(now, sizeof(now), "%Y-%m-%dT%H:%M:%S", &timeinfo);
+  return now;
+}
+
+//Create a dir in SD card
+void createDir(fs::FS &fs, const char * path){
+    Serial.printf("Creating Dir: %s\n", path);
+    if(fs.mkdir(path)){
+        Serial.println("Dir created");
+    } else {
+        Serial.println("mkdir failed");
+    }
+}
 
 void getHttpStatus(){
-
-  ///rr_model?flags=d99fn
+  ////rr_status?type=3
   ///rr_model?key=job
 
   String url = "http://" + printer ;
@@ -364,13 +400,24 @@ void getHttpStatus(){
   String state = doc["status"];
   Serial.println("retorno:"+ state);
   
-  String inputs = doc["currentLayer"];
-  Serial.println("retorno1:"+ inputs);
+  int currentLayer = doc["currentLayer"];
+  Serial.println("retorno1:"+ currentLayer);
 
-      //serializeJson(doc, Serial);
+  // Verify if printer change status from idle to printing
+  if(statusDuet.status == "I"   &&  state == "P"){
+      String dateTime = getDate();
+      Serial.println("create folder at:"  + dateTime);  
+      createDir(SD_MMC, "dateTime");
+      statusDuet.folder = dateTime;
+  }
 
-
-
+  //TODO create a constant
+  String validos = "HPIE";
+  if (validos.indexOf(state) >= 0 ){
+    Serial.println("state changed.");
+    statusDuet.status = state;
+  }
+  statusDuet.layer = currentLayer;
 
 }
 
