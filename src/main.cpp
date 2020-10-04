@@ -28,6 +28,7 @@
 #include <ArduinoJson.h>
 #include <HTTPClient.h>
 #include <time.h>
+#include <EEPROM.h>            // read and write from flash memory
 
 
 struct tm timeinfo;
@@ -41,14 +42,18 @@ typedef struct StatusDuet
  
 StatusDuet statusDuet;
 
+//TOTO externalize that on config.txt
 const char* ntpServer = "0.br.pool.ntp.org";
-const long gmtOffset_sec = -3;
+const long gmtOffset_sec = 0;
 const int daylightOffset_sec = 3600;
 
 //Replace with your network credentials
 String ssid = "Corona Virus";
 String password = "orlando21";
 String printer = "192.168.5.31";
+unsigned long updateInterval = 1000;
+// define the number of bytes you want to access
+#define EEPROM_SIZE 3
 
 #define PART_BOUNDARY "123456789000000000000987654321"
 
@@ -77,18 +82,18 @@ String printer = "192.168.5.31";
 #error "Camera model not selected"
 #endif
 
-static const char *_STREAM_CONTENT_TYPE = "multipart/x-mixed-replace;boundary=" PART_BOUNDARY;
-static const char *_STREAM_BOUNDARY = "\r\n--" PART_BOUNDARY "\r\n";
-static const char *_STREAM_PART = "Content-Type: image/jpeg\r\nContent-Length: %u\r\n\r\n";
+//static const char *_STREAM_CONTENT_TYPE = "multipart/x-mixed-replace;boundary=" PART_BOUNDARY;
+//static const char *_STREAM_BOUNDARY = "\r\n--" PART_BOUNDARY "\r\n";
+//static const char *_STREAM_PART = "Content-Type: image/jpeg\r\nContent-Length: %u\r\n\r\n";
 
 unsigned long miliseconds = 0;
-const long interval = 1000;
-
-httpd_handle_t stream_httpd = NULL;
 
 
+//httpd_handle_t stream_httpd = NULL;
+void startCameraServer();
 
 
+/*
 
 static esp_err_t stream_handler(httpd_req_t *req)
 {
@@ -184,6 +189,7 @@ void startCameraServer()
     httpd_register_uri_handler(stream_httpd, &index_uri);
   }
 }
+*/
 
 String getValue(String data, char separator, int index)
 {
@@ -227,7 +233,10 @@ void configure()
   {
     Serial.println("Opening file to write failed");
 
-    String dados = "ssid=" + String(ssid) + "\n" + "password=" + password + "\n" + "printer=" + printer;
+    String dados = "ssid=" + String(ssid) + "\n" + 
+                   "password=" + password + "\n" + 
+                   "printer=" + printer + "\n" + 
+                   "updateInterval=" + updateInterval;
 
     file = SD_MMC.open("/config.txt", FILE_WRITE);
 
@@ -259,10 +268,13 @@ void configure()
       String passwordString = file.readStringUntil('\n');
       password = getValue(passwordString, '=', 1);
       printer = getValue(file.readStringUntil('\n'), '=', 1);
+      String updateIntervalStr = getValue(file.readStringUntil('\n'), '=', 1);
+      updateInterval  = strtol( updateIntervalStr.c_str(), NULL, 0 );
 
       Serial.println("ssidString:" + ssid);
       Serial.println("passwordString:" + password);
       Serial.println("printer:" + printer);
+      Serial.println("updateInterval:" + updateInterval);
     }
   }
 
@@ -277,7 +289,7 @@ void configure()
   Serial.println("WiFi connected");
 
   Serial.print("Camera Stream Ready! Go to: http://");
-  Serial.print(WiFi.localIP());
+  Serial.println(WiFi.localIP());
 }
 
 void setup()
@@ -373,18 +385,52 @@ String getDate(){
   }
 
   char now[120];
-  strftime(now, sizeof(now), "%Y-%m-%dT%H:%M:%S", &timeinfo);
+  strftime(now, sizeof(now), "%Y-%m-%dT%H-%M", &timeinfo);
   return now;
 }
 
 //Create a dir in SD card
-void createDir(fs::FS &fs, const char * path){
+void createDir(const char * path){
     Serial.printf("Creating Dir: %s\n", path);
-    if(fs.mkdir(path)){
+    if(SD_MMC.mkdir(path)){
         Serial.println("Dir created");
     } else {
         Serial.println("mkdir failed");
     }
+}
+
+void takePicture(){
+// initialize EEPROM with predefined size
+  EEPROM.begin(EEPROM_SIZE);
+  int pictureNumber = EEPROM.read(0) + 1;
+
+  camera_fb_t * fb = NULL;
+
+  // Take Picture with Camera
+  fb = esp_camera_fb_get();  
+  if(!fb) {
+    Serial.println("Camera capture failed");
+    return;
+  }
+
+  // Path where new picture will be saved in SD Card
+  String path = statusDuet.folder +  "/picture" + String(pictureNumber) +".jpg";
+
+  fs::FS &fs = SD_MMC; 
+  Serial.printf("Picture file name: %s\n", path.c_str());
+  
+  File file = fs.open(path.c_str(), FILE_WRITE);
+  if(!file){
+    Serial.println("Failed to open file in writing mode");
+  } 
+  else {
+    file.write(fb->buf, fb->len); // payload (image), payload length
+    Serial.printf("Saved file to path: %s\n", path.c_str());
+    EEPROM.write(0, pictureNumber);
+    EEPROM.commit();
+  }
+  file.close();
+  esp_camera_fb_return(fb); 
 }
 
 void getHttpStatus(){
@@ -407,8 +453,12 @@ void getHttpStatus(){
   if(statusDuet.status == "I"   &&  state == "P"){
       String dateTime = getDate();
       Serial.println("create folder at:"  + dateTime);  
-      createDir(SD_MMC, "dateTime");
-      statusDuet.folder = dateTime;
+      statusDuet.folder = '/' + dateTime;
+      createDir(statusDuet.folder.c_str());
+      EEPROM.write(0, 0);
+      EEPROM.commit();
+  }else  if(statusDuet.status == "P"   &&  state == "I"){
+    takePicture();
   }
 
   //TODO create a constant
@@ -417,10 +467,14 @@ void getHttpStatus(){
     Serial.println("state changed.");
     statusDuet.status = state;
   }
+
+  if(state == "P"){
+    if (currentLayer > statusDuet.layer){
+      takePicture();
+    }
+  }
   statusDuet.layer = currentLayer;
-
 }
-
 
 void readDuet()
 {
@@ -434,7 +488,7 @@ void loop()
   delay(1);
 
   unsigned long currentMillis = millis();
-  if (currentMillis - miliseconds >= interval)
+  if (currentMillis - miliseconds >= updateInterval)
   {
     // save the last time you blinked the LED
     miliseconds = currentMillis;
