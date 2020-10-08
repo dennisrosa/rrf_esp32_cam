@@ -5,6 +5,21 @@
 #include "camera_index.h"
 #include "Arduino.h"
 #include <dl_lib_matrix3d.h>
+#include <file_utils.h>
+#include <ArduinoJson.h>
+
+#include <stdio.h>
+#include <string.h>
+#include <sys/param.h>
+#include <sys/unistd.h>
+#include <sys/stat.h>
+#include <dirent.h>
+
+#include "esp_err.h"
+#include "esp_log.h"
+
+#include "esp_vfs.h"
+#include "esp_spiffs.h"
 
 
 #define PART_BOUNDARY "123456789000000000000987654321"
@@ -16,6 +31,20 @@ static const char* _STREAM_PART = "Content-Type: image/jpeg\r\nContent-Length: %
 static int8_t detection_enabled = 0;
 static int8_t recognition_enabled = 0;
 static int8_t is_enrolling = 0;
+
+/* Scratch buffer size */
+#define SCRATCH_BUFSIZE  8192
+
+/* Max length a file path can have on storage */
+#define FILE_PATH_MAX (ESP_VFS_PATH_MAX + CONFIG_SPIFFS_OBJ_NAME_LEN)
+
+struct file_server_data {
+    /* Base path of file storage */
+    char base_path[256];
+
+    /* Scratch buffer for temporary storage during file transfer */
+    char scratch[SCRATCH_BUFSIZE];
+};
 
 httpd_handle_t stream_httpd = NULL;
 httpd_handle_t camera_httpd = NULL;
@@ -317,6 +346,229 @@ static esp_err_t stream_handler(httpd_req_t *req){
     return res;
 }
 
+String listDirectories(File dir) {
+  String response = "";
+  Serial.println("rewind");
+  dir.rewindDirectory();
+  
+  while(true) {
+     File entry =  dir.openNextFile();
+     if (! entry) {
+       Serial.println("**nomorefiles**");
+       break;
+     }
+
+     // Recurse for directories, otherwise print the file size
+     if (entry.isDirectory()) {
+       response += String("<a href=/open?path=") + String(entry.name()) + String(">") + String(entry.name()) + String("</a>") + String("</br>");
+     }else{
+       response += String(entry.name())  + String("</br>");  
+     }
+     Serial.println("antes close");
+     entry.close();
+     Serial.println("depois close");
+   }
+   Serial.println("devolvendo string" + response);
+   return String("<h1>Hello Secure World!</h1> <br> List files:</br>" + response) ;
+}
+
+
+static esp_err_t  list_handler(httpd_req_t *req){
+    //listDir(SD_MMC, "/" , 0);
+    File f = SD_MMC.open("/", "r");
+    httpd_resp_set_type(req, "text/html");
+    Serial.println("#######");
+    String list = listDirectories(f);
+    Serial.println("#######");
+    Serial.println("retorno" + list);
+    const char* dados = list.c_str();
+
+    Serial.println("tamanho:" + strlen(dados) );
+
+    httpd_resp_send(req,  dados, strlen(dados));    
+
+    return ESP_OK;
+}
+
+/* Copies the full path into destination buffer and returns
+ * pointer to path (skipping the preceding base path) */
+static const char* get_path_from_uri(char *dest, const char *base_path, const char *uri, size_t destsize)
+{
+    const size_t base_pathlen = strlen(base_path);
+    size_t pathlen = strlen(uri);
+
+    const char *quest = strchr(uri, '?');
+    if (quest) {
+        pathlen = MIN(pathlen, quest - uri);
+    }
+    const char *hash = strchr(uri, '#');
+    if (hash) {
+        pathlen = MIN(pathlen, hash - uri);
+    }
+
+    if (base_pathlen + pathlen + 1 > destsize) {
+        /* Full path string won't fit into destination buffer */
+        return NULL;
+    }
+
+    /* Construct full path (base + path) */
+    strcpy(dest, base_path);
+    strlcpy(dest + base_pathlen, uri, pathlen + 1);
+
+    /* Return pointer to path, skipping the base */
+    return dest + base_pathlen;
+}
+
+/* HTTP GET handler for downloading files */
+esp_err_t download_get_handler(httpd_req_t *req){
+
+    Serial.println("download :" );
+    char filepath[FILE_PATH_MAX];
+    
+    const char *filename = get_path_from_uri(filepath, ((struct file_server_data *)req->user_ctx)->base_path,
+                                             req->uri, sizeof(filepath));   
+
+    Serial.println(filename); 
+    /*
+    //const char *filepath_prefix = "/sdcard/";
+    char *filename = NULL;
+    size_t filename_len = httpd_req_get_url_query_len(req);
+    Serial.println("query String: " + httpd_req_get_url_query_str());
+
+    if (filename_len == 0) {
+        const char * resp_str = "Please specify a filename. eg. file?somefile.txt";
+        httpd_resp_send(req, resp_str, strlen(resp_str));
+        return ESP_OK;
+    }
+    //filename = malloc(strlen(filepath_prefix) + filename_len + 1); // extra 1 byte for null termination
+    //strncpy(filename, filepath_prefix, strlen(filepath_prefix));
+
+    // Get null terminated filename
+    //httpd_req_get_url_query_str(req, filename + strlen(filepath_prefix), filename_len + 1);
+    //ESP_LOGI(TAG, "Reading file : %s", filename + strlen(filepath_prefix));
+
+    File f = SD_MMC.open(filename, "r");
+    //free(filename);
+    if (f) {
+        const char * resp_str = "File doesn't exist";
+        httpd_resp_send(req, resp_str, strlen(resp_str));
+        return ESP_OK;
+    }
+
+
+    char   chunk[1024];
+    size_t chunksize;
+    do {
+        chunksize = fread(chunk, 1, sizeof(chunk), f);
+        if (httpd_resp_send_chunk(req, chunk, chunksize) != ESP_OK) {
+            fclose(f);
+            return ESP_FAIL;
+        }
+    } while (chunksize != 0);
+
+    httpd_resp_send_chunk(req, NULL, 0);
+    fclose(f);
+*/
+    
+    return ESP_OK;
+}
+
+esp_err_t get_handler(httpd_req_t *req)
+{
+
+    Serial.println("get handler");
+    size_t filename_len = httpd_req_get_url_query_len(req);
+    Serial.println("" + String(filename_len));
+
+
+    if (filename_len == 0) {
+        char* resp_str = "Please specify a filename. eg. file?somefile.txt";
+        httpd_resp_send(req, resp_str, strlen(resp_str));
+        return ESP_OK;
+    }
+    
+    char variable[128] = {0,};  
+    char*  buf;
+    size_t buf_len;
+    buf_len = httpd_req_get_url_query_len(req) + 1;
+    if (buf_len > 1) {
+        buf = (char*)malloc(buf_len);
+        if (httpd_req_get_url_query_str(req, buf, buf_len) == ESP_OK) {
+            Serial.println("***********");
+            Serial.println("path");
+            if (httpd_query_key_value(buf, "path", variable, sizeof(variable)) == ESP_OK) {
+                Serial.println(variable);
+            }
+
+            Serial.println(buf);
+            Serial.println("***********");
+            
+            //listDir(SD_MMC, "/" , 0
+            File f = SD_MMC.open(variable, "r");
+            Serial.println(f);
+            
+            httpd_resp_set_type(req, "text/html");
+            String list = listDirectories(f);
+            const char* dados = list.c_str();
+
+            Serial.println("tamanho:" + strlen(dados) );
+
+            free(buf);
+            httpd_resp_send(req,  dados, strlen(dados));    
+
+        }
+        free(buf);
+    }
+    return ESP_OK;
+}
+
+static char* retrivePathfromRequest(httpd_req_t *req){
+
+    char*  buf;
+    size_t buf_len;
+    buf_len = httpd_req_get_url_query_len(req) + 1;
+
+    if (buf_len > 1) {
+        buf = (char*)malloc(buf_len);
+        if (httpd_req_get_url_query_str(req, buf, buf_len) == ESP_OK) {
+            return buf;
+        }
+        free(buf);
+    }        
+    return buf;
+}
+
+static esp_err_t  lista_handler(httpd_req_t *req){
+
+    DynamicJsonDocument root(1024);
+    JsonArray data = root.createNestedArray("path");
+    String path = retrivePathfromRequest(req);
+    path = path.substring(5,path.length());
+    Serial.println(path);
+
+    File f = SD_MMC.open(path, "r");
+    f.rewindDirectory();
+  
+    while(true) {
+        Serial.println(".");
+        File entry =  f.openNextFile();
+        if (! entry) {
+            Serial.println("**nomorefiles**");
+            break;
+        }
+ 
+        JsonObject obj = data.createNestedObject();
+        obj["path"] = String(entry.name());
+        obj["directory"] = String(entry.isDirectory());
+        entry.close();
+    }
+
+    char  dados[1000];
+    serializeJson(root, dados);   
+    httpd_resp_set_type(req, "application/json"); 
+    httpd_resp_send(req,  dados, strlen(dados));    
+    return ESP_OK;
+}
 
 void startCameraServer(){
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
@@ -356,6 +608,26 @@ void startCameraServer(){
         .user_ctx  = NULL
     };
 
+    httpd_uri_t list_dir_uri = {
+        .uri       = "/list",
+        .method    = HTTP_GET,
+        .handler   = list_handler,
+        .user_ctx  = NULL
+    };
+
+    httpd_uri_t file_download_uri = {
+        .uri       = "/open",  // Match all URIs of type /path/to/file
+        .method    = HTTP_GET,
+        .handler   = get_handler,
+        .user_ctx  = NULL    // Pass server data as context
+    };
+
+    httpd_uri_t file_lista_uri = {
+        .uri       = "/lista",  
+        .method    = HTTP_GET,
+        .handler   = lista_handler,
+        .user_ctx  = NULL    // Pass server data as context
+    };    
     
     Serial.printf("Starting web server on port: '%d'\n", config.server_port);
     if (httpd_start(&camera_httpd, &config) == ESP_OK) {
@@ -363,6 +635,9 @@ void startCameraServer(){
         httpd_register_uri_handler(camera_httpd, &cmd_uri);
         httpd_register_uri_handler(camera_httpd, &status_uri);
         httpd_register_uri_handler(camera_httpd, &capture_uri);
+        httpd_register_uri_handler(camera_httpd, &list_dir_uri);
+        httpd_register_uri_handler(camera_httpd, &file_download_uri);
+        httpd_register_uri_handler(camera_httpd, &file_lista_uri);
     }
 
     config.server_port += 1;
@@ -372,3 +647,4 @@ void startCameraServer(){
         httpd_register_uri_handler(stream_httpd, &stream_uri);
     }
 }
+

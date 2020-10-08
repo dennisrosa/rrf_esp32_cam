@@ -492,6 +492,6 @@ void loop()
   {
     // save the last time you blinked the LED
     miliseconds = currentMillis;
-    readDuet();
+    //readDuet();
   }
 }
