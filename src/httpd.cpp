@@ -151,6 +151,7 @@ static esp_err_t cmd_handler(httpd_req_t *req)
         if (!buf)
         {
             httpd_resp_send_500(req);
+            free(buf);
             return ESP_FAIL;
         }
         if (httpd_req_get_url_query_str(req, buf, buf_len) == ESP_OK)
@@ -165,6 +166,7 @@ static esp_err_t cmd_handler(httpd_req_t *req)
                 httpd_resp_send_404(req);
                 return ESP_FAIL;
             }
+            free(buf);
         }
         else
         {
@@ -600,10 +602,13 @@ static esp_err_t lista_handler(httpd_req_t *req)
             Serial.println("**nomorefiles**");
             break;
         }
+        String name = String(entry.name());
 
-        JsonObject obj = data.createNestedObject();
-        obj["path"] = String(entry.name());
-        obj["directory"] = String(entry.isDirectory());
+        if( name != "/config.txt" && name != "/.Spotlight-V100"){
+            JsonObject obj = data.createNestedObject();
+            obj["path"] = name;
+            obj["directory"] = String(entry.isDirectory());
+        }
         entry.close();
     }
 
@@ -630,6 +635,7 @@ static esp_err_t image_handler(httpd_req_t *req)
         int filesize = f.size();
         Serial.println("size:" + String(filesize));
         httpd_resp_set_type(req, "image/jpeg");
+        httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
         String header = "inline; filename=" + path;
         httpd_resp_set_hdr(req, "Content-Disposition", header.c_str());
         httpd_resp_set_hdr(req, "Content-Length:", (const char *)filesize);
@@ -645,8 +651,7 @@ static esp_err_t image_handler(httpd_req_t *req)
         {
             buf[i] = f.read();
             Serial.println("file read.");
-            httpd_resp_set_type(req, "image/jpeg");
-            httpd_resp_send(req, (const char *)buf, sizeof(buf));
+            httpd_resp_send_chunk(req, (const char *)buf, sizeof(buf));
             i++;
         }
 
@@ -676,16 +681,15 @@ static esp_err_t download_get_handler(httpd_req_t *req)
     }
 
     Serial.println(".");
-    httpd_resp_set_type(req, "image/jpeg");
-
-    Serial.println(".");
     
+    httpd_resp_set_type(req, "image/jpeg");
+    httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
+    httpd_resp_set_hdr(req, "Access-Control-Allow-Methods", "POST, GET, OPTIONS");
+    String header = "inline; filename=" + path;
+    httpd_resp_set_hdr(req, "Content-Disposition", header.c_str());
 
-    // this is going to get the number of bytes in the file and give us the value in an integer
     int fileSize = fd.size();
     int chunkSize=1024;
-    //This is a character array to store a chunk of the file.
-    //We'll store 1024 characters at a time
     char buf[chunkSize];
     int numberOfChunks=(fileSize/chunkSize)+1;
     
@@ -696,15 +700,13 @@ static esp_err_t download_get_handler(httpd_req_t *req)
       }
       fd.read((uint8_t *)buf, chunkSize);
       remainingChunks=remainingChunks-chunkSize;
+      Serial.println(remainingChunks);
       httpd_resp_send_chunk(req, (const char *)buf, sizeof(buf));
     }
-
-
-    /* Close file after sending complete */
+    
     fd.close();
-
-    /* Respond with an empty chunk to signal HTTP response completion */
     httpd_resp_send_chunk(req, NULL, 0);
+    
     return ESP_OK;
 }
 
