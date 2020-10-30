@@ -1,0 +1,29 @@
+
+.MainScreen{
+    display: flex;
+}
+
+
+.Diretorio{
+    background-color: aqua;
+    flex: 1 100%;
+    margin: 20px;
+    border: 3px solid #000;
+    border-radius: 10px;
+    overflow: hidden;
+    min-width: 500px;
+    
+    
+}
+
+.Pasta{
+    background-color: brown;
+    flex: 1 100%;
+    margin: 20px;
+    border: 3px solid #000;
+    border-radius: 10px;
+    overflow: hidden;
+    min-width: 1000px;
+    
+    
+}
