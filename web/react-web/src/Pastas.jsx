@@ -2,18 +2,20 @@ import React, { Component } from 'react'
 
 export default class Pastas extends Component {
 
-    imgEndpoint = "/xupa?path=";
-
-    endpoint = "/lista";
-    path = "";
+    imgEndpoint = "/image?path=";
+    endpoint = "/lista?path=";
+	
 
     state = {
         contacts: []
     }
 
-    listar(path) {
-        this.path = path;
-        fetch(this.endpoint + path, { mode: "no-cors" })
+    listar() {
+		this.setState({ contacts:[]})
+		const url = this.endpoint + this.props.path
+        
+		console.log("Path" , url)
+        fetch(url, { mode: "no-cors" })
             .then(res => res.json())
             .then((data) => {
                 this.setState({ contacts: Array.from(data.path) })
@@ -48,22 +50,20 @@ export default class Pastas extends Component {
     }
 
 
-    componentDidMount() {
-        this.listar("/");
-    }
-
     render() {
+		
+
         return (
             <div>
                 <div className="Pasta">
                     <h1>Pastas  {this.props.path} </h1>
                     <div id="imgGif"></div>
-
-                    {this.path !== '/' ? <button onClick={() => this.gerarGif()}>Gerar GIF</button> : null}
+                    
+                    
                     <ul>
                         {this.state.contacts.map((c) => (
                             <li key={c.path} >
-                                {c.directory === '0' ? <img crossOrigin="Anonymous" src={this.imgEndpoint + c.path} /> : <div></div>}
+                                {c.directory === '0' ? <img crossOrigin="Anonymous" src={ this.imgEndpoint + encodeURIComponent(c.path) } /> : <div></div>}
                             </li>
                         ))}
                     </ul>

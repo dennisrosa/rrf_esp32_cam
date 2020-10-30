@@ -44,9 +44,10 @@ def listaDiretorios():
     return response
 
 
-@app.route('/image/<image>')
-def getImage(image):
-
+@app.route('/image')
+def getImage():
+    path = request.args.get('path')
+    
     imagens = ["34004c36-b7ed-4d75-b75a-ed290b6cafef.jpg", "b2d00d26-888a-4b2e-9630-d40067072a36.jpg", "f13ce34c-9b72-4ee4-a47d-4f523bb592aa.jpg"]
 
     with counter.get_lock():

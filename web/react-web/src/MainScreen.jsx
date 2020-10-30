@@ -5,12 +5,19 @@ import './MainScreen.css'
 
 export default props => {
 
-	const [nome, alteraNome] = useState('Pedro')
+
+	const pastas = React.createRef();
+	const [path, changePath] = useState("/");
+
+	function onChangePath(newPath){
+		changePath(newPath);
+		pastas.current.listar();
+	}	
 
 	return (
 		<div className="MainScreen">
-			<Diretorio path={nome} />
-			<Pastas path={nome} />
+			<Diretorio path={path} onChangePath={onChangePath} />
+			<Pastas path={path} ref={pastas}/>
 		</div>
 	)
 
