@@ -3,14 +3,11 @@ import React, { Component } from 'react'
 export default class Diretorio extends Component {
 
     endpoint = "/lista";
-    path = "";
-
     state = {
         contacts: []
     }
     
-    listar(path) {
-        this.path = path;
+    listar() {
         fetch(this.endpoint, { mode: "no-cors" })
             .then(res => res.json())
             .then((data) => {
@@ -21,7 +18,7 @@ export default class Diretorio extends Component {
 
 
     componentDidMount() {
-        this.listar("/");
+        this.listar();
     }
 
     render() {
@@ -41,7 +38,6 @@ export default class Diretorio extends Component {
             </div>
         )
     }    
-
 
 }
 

@@ -10,6 +10,7 @@ export default props => {
 	const [path, changePath] = useState("/");
 
 	function onChangePath(newPath){
+		pastas.current.clean();
 		changePath(newPath);
 		pastas.current.listar();
 	}	

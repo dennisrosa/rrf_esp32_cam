@@ -5,13 +5,28 @@ export default class Pastas extends Component {
     imgEndpoint = "/image?path=";
     endpoint = "/lista?path=";
 	
-
     state = {
-        contacts: []
+        contacts: [],
+        loaded: 0,
     }
 
+    clean() {
+        this.setState({ loaded: 0 })
+        this.setState({ contacts: [] })
+    };
+
+    componentDidMount() {
+        this.myInterval = setInterval(() => {
+
+            if(this.state.loaded  <= this.state.contacts.length  ){
+                this.setState({ loaded: this.imagesLoaded() })
+            }
+             
+        }, 1000)
+    }
+
+
     listar() {
-		this.setState({ contacts:[]})
 		const url = this.endpoint + this.props.path
         
 		console.log("Path" , url)
@@ -31,14 +46,10 @@ export default class Pastas extends Component {
         ag.setSize(640, 480);
         ag.setDelay(1);
 
-
-
         for (var i = 0; i < imgs.length; i++) {
             ag.addFrame(imgs[i]);
         }
 
-
-        // This is asynchronous, rendered with WebWorkers
         var animatedImage = document.createElement('img');
         ag.getBase64GIF(function (image) {
             animatedImage.src = image;
@@ -49,27 +60,50 @@ export default class Pastas extends Component {
         console.log(imgs);
     }
 
+    imagesLoaded() {
+        var count = 0;
+        const imgElements = document.querySelectorAll('img');
+        for (let i = 0; i < imgElements.length; i += 1) {
+          const img = imgElements[i];
+          if (img.complete) {
+            count++;
+          }
+        }
+        return count;
+      }
+
+    onFallbackImage(ev){
+        console.log("fallback image"  +ev.target.src );
+        ev.target.src = ev.target.src + "&a=1"
+    }
+
+    display(){
+
+        var text = this.props.path ;
+        if (this.state.loaded  != this.state.contacts.length){
+            text +=  " - Processing ....  " + this.state.loaded + " of " + this.state.contacts.length;            
+        }
+
+        return text;
+    }
 
     render() {
-		
 
         return (
             <div>
                 <div className="Pasta">
-                    <h1>Pastas  {this.props.path} </h1>
+                    <h1>Pastas  {this.display()}</h1>
+        
                     <div id="imgGif"></div>
-                    
                     
                     <ul>
                         {this.state.contacts.map((c) => (
                             <li key={c.path} >
-                                {c.directory === '0' ? <img crossOrigin="Anonymous" src={ this.imgEndpoint + encodeURIComponent(c.path) } /> : <div></div>}
+                                {c.directory === '0' ? <img onError={this.onFallbackImage}  crossOrigin="Anonymous" src={ this.imgEndpoint + encodeURIComponent(c.path) } /> : <div></div>}
                             </li>
                         ))}
                     </ul>
-
                 </div>
-
             </div>
         )
     }
