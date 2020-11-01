@@ -13,6 +13,7 @@ export default class Pastas extends Component {
     clean() {
         this.setState({ loaded: 0 })
         this.setState({ contacts: [] })
+        document.getElementById('imgGif').innerHTML = "";
     };
 
     componentDidMount() {
@@ -25,10 +26,10 @@ export default class Pastas extends Component {
         }, 1000)
     }
 
-
     listar() {
 		const url = this.endpoint + this.props.path
-        
+        this.setState({ contacts: ['a'] });
+
 		console.log("Path" , url)
         fetch(url, { mode: "no-cors" })
             .then(res => res.json())
@@ -56,7 +57,6 @@ export default class Pastas extends Component {
             var e = document.getElementById('imgGif');
             e.appendChild(animatedImage);
         });
-
         console.log(imgs);
     }
 
@@ -80,10 +80,11 @@ export default class Pastas extends Component {
     display(){
 
         var text = this.props.path ;
-        if (this.state.loaded  != this.state.contacts.length){
-            text +=  " - Processing ....  " + this.state.loaded + " of " + this.state.contacts.length;            
+        if (this.state.contacts.length === 1){
+            text +=  " - loading ....  " ;            
+        } else if (this.state.loaded  != this.state.contacts.length){
+            text +=  " - Processing ....  " + this.state.loaded + " of " + (this.state.contacts.length +1) ;            
         }
-
         return text;
     }
 
@@ -92,7 +93,8 @@ export default class Pastas extends Component {
         return (
             <div>
                 <div className="Pasta">
-                    <h1>Pastas  {this.display()}</h1>
+                    <h1>Pastas {this.display()}</h1>
+                    { this.state.contacts.length > 0 & this.state.loaded === this.state.contacts.length ? <button onClick={() => this.gerarGif()}>Gerar GIF</button> : null}
         
                     <div id="imgGif"></div>
                     
@@ -108,4 +110,3 @@ export default class Pastas extends Component {
         )
     }
 }
-

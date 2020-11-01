@@ -51,7 +51,7 @@ def listaDiretorios():
 def teste():
     path = []
 
-    for x in range(1, 100):
+    for x in range(1, 10):
         rec = x = {
             "path": datetime.now().isoformat() + ".jpg",
             "directory": '0'
