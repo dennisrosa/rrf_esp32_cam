@@ -1,4 +1,4 @@
-import React, { Component, useState } from 'react'
+import React, { useState } from 'react'
 import Diretorio from './Diretorio'
 import Pastas from './Pastas'
 import './MainScreen.css'
@@ -12,7 +12,7 @@ export default props => {
 	function onChangePath(newPath){
 		pastas.current.clean();
 		changePath(newPath);
-		pastas.current.listar();
+		pastas.current.listar(newPath);
 	}	
 
 	return (
@@ -21,7 +21,6 @@ export default props => {
 			<Pastas path={path} ref={pastas}/>
 		</div>
 	)
-
 
 }
  

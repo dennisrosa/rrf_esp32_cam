@@ -2,15 +2,17 @@ import React, { Component } from 'react'
 
 export default class Diretorio extends Component {
 
-    endpoint = "/lista";
+    endpoint = "http://192.168.1.70/lista?path=/";
     state = {
         contacts: []
     }
     
     listar() {
-        fetch(this.endpoint, { mode: "no-cors" })
+        console.log(this.endpoint);
+        fetch(this.endpoint)
             .then(res => res.json())
             .then((data) => {
+                console.log("res data", data);
                 this.setState({ contacts: Array.from(data.path) })
             })
             .catch(console.log)
@@ -29,7 +31,7 @@ export default class Diretorio extends Component {
                     <ul>
                         {this.state.contacts.map((c) => (
                             <li key={c.path} >
-                                {c.directory === '1' ? <a href="#" onClick={() => {this.props.onChangePath(c.path)} }>{c.path}</a> : c.path}
+                                {c.directory === '1' ? <a  onClick={() => {this.props.onChangePath(c.path)} }>{c.path}</a> : c.path}
                             </li>
                         ))}
                     </ul>

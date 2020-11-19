@@ -2,12 +2,13 @@ import React, { Component } from 'react'
 
 export default class Pastas extends Component {
 
-    imgEndpoint = "/image?path=";
-    endpoint = "/lista?path=";
+    imgEndpoint = "http://192.168.1.70/image?path=";
+    endpoint = "http://192.168.1.70/lista?path=";
 	
     state = {
-        contacts: [],
+        images: [],
         loaded: 0,
+        displayText : ""
     }
 
     clean() {
@@ -19,28 +20,30 @@ export default class Pastas extends Component {
     componentDidMount() {
         this.myInterval = setInterval(() => {
 
-            if(this.state.loaded  <= this.state.contacts.length  ){
+            if(this.state.loaded  <= this.state.images.length  ){
                 this.setState({ loaded: this.imagesLoaded() })
             }
              
-        }, 1000)
+        }, 30000)
     }
 
-    listar() {
-		const url = this.endpoint + this.props.path
-        this.setState({ contacts: ['a'] });
+    listar(path) {
+		const url = this.endpoint + path
+        this.setState({ images: ['a'] });
 
 		console.log("Path" , url)
-        fetch(url, { mode: "no-cors" })
+        fetch(url)
             .then(res => res.json())
             .then((data) => {
-                this.setState({ contacts: Array.from(data.path) })
+                this.setState({ images: Array.from(data.path) });
+                console.log("contatcts", this.state.images);
             })
             .catch(console.log)
     };
 
     gerarGif() {
         console.log("Gerar");
+        document.getElementById('imgGif').innerHTML = "";
         var imgs = document.querySelectorAll('img');
 
         var ag = new window.Animated_GIF();
@@ -58,7 +61,9 @@ export default class Pastas extends Component {
             e.appendChild(animatedImage);
         });
         console.log(imgs);
+        this.setState({ displayText: "" })
     }
+
 
     imagesLoaded() {
         var count = 0;
@@ -74,16 +79,24 @@ export default class Pastas extends Component {
 
     onFallbackImage(ev){
         console.log("fallback image"  +ev.target.src );
-        ev.target.src = ev.target.src + "&a=1"
+
+        var n = ev.target.src.search("&a");
+        if (n > 0 ){
+            ev.target.src = ev.target.src.substr(1,n-1);
+        }else {
+            ev.target.src = ev.target.src + "&a=" + Date.now();
+        }
     }
 
     display(){
 
         var text = this.props.path ;
-        if (this.state.contacts.length === 1){
+        if (this.state.images.length === 1){
             text +=  " - loading ....  " ;            
-        } else if (this.state.loaded  != this.state.contacts.length){
-            text +=  " - Processing ....  " + this.state.loaded + " of " + (this.state.contacts.length +1) ;            
+        } else if ( document.getElementById('imgGif')  &&  document.getElementById('imgGif').innerHTML !== ""){
+            text +=  "" ;            
+        } else if (this.state.loaded  !== this.state.images.length){
+            text +=  " - Processing ....  " + this.state.loaded + " of " + (this.state.images.length +1) ;            
         }
         return text;
     }
@@ -93,15 +106,15 @@ export default class Pastas extends Component {
         return (
             <div>
                 <div className="Pasta">
-                    <h1>Pastas {this.display()}</h1>
-                    { this.state.contacts.length > 0 & this.state.loaded === this.state.contacts.length ? <button onClick={() => this.gerarGif()}>Gerar GIF</button> : null}
+                    <h1>Pastas {this.display()} </h1>
+                    { this.state.images.length > 0 & this.state.loaded === this.state.images.length  ? <button onClick={() => this.gerarGif()}>Gerar GIF</button> : null}
         
                     <div id="imgGif"></div>
                     
                     <ul>
-                        {this.state.contacts.map((c) => (
+                        {this.state.images.map((c) => (
                             <li key={c.path} >
-                                {c.directory === '0' ? <img onError={this.onFallbackImage}  crossOrigin="Anonymous" src={ this.imgEndpoint + encodeURIComponent(c.path) } /> : <div></div>}
+                                {c.directory === '0' ? <img alt={c.path} onError={this.onFallbackImage}  crossOrigin="Anonymous" src={ this.imgEndpoint + c.path } /> : <div></div>}
                             </li>
                         ))}
                     </ul>
