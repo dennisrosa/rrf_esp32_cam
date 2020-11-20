@@ -428,58 +428,6 @@ static esp_err_t stream_handler(httpd_req_t *req)
     return res;
 }
 
-String listDirectories(File dir)
-{
-    String response = "";
-    Serial.println("rewind");
-    dir.rewindDirectory();
-
-    while (true)
-    {
-        File entry = dir.openNextFile();
-        if (!entry)
-        {
-            Serial.println("**nomorefiles**");
-            break;
-        }
-
-        if (entry.isDirectory())
-        {
-            response += String("<a href=/open?path=") + String(entry.name()) + String(">") + String(entry.name()) + String("</a>") + String("</br>");
-        }
-        else
-        {   
-            Serial.println(String(entry.name()));
-            //if (entry.name() != null){
-                response += String(entry.name()) + String("</br>");
-            //}
-        }
-        Serial.println("antes close");
-        entry.close();
-        Serial.println("depois close");
-    }
-    Serial.println("devolvendo string" + response);
-    return String("<h1>Hello Secure World!</h1> <br> List files:</br>" + response);
-}
-
-static esp_err_t list_handler(httpd_req_t *req)
-{
-    //listDir(SD_MMC, "/" , 0);
-    File f = SD_MMC.open("/", "r");
-    httpd_resp_set_type(req, "text/html");
-    Serial.println("#######");
-    String list = listDirectories(f);
-    Serial.println("#######");
-    Serial.println("retorno" + list);
-    const char *dados = list.c_str();
-
-    Serial.println("tamanho:" + strlen(dados));
-
-    httpd_resp_send(req, dados, strlen(dados));
-
-    return ESP_OK;
-}
-
 /* Copies the full path into destination buffer and returns
  * pointer to path (skipping the preceding base path) */
 static const char *get_path_from_uri(char *dest, const char *base_path, const char *uri, size_t destsize)
@@ -567,7 +515,6 @@ esp_err_t get_handler(httpd_req_t *req)
 
 static char *retrivePathfromRequest(httpd_req_t *req)
 {
-
     char *buf;
     size_t buf_len;
     buf_len = httpd_req_get_url_query_len(req) + 1;
@@ -753,8 +700,7 @@ void startCameraServer()
         .uri = "/image", // Match all URIs of type /path/to/file
         .method = HTTP_GET,
         .handler = download_get_handler,
-        .user_ctx = NULL // Pass server data as context
-    };
+        .user_ctx = NULL};
 
     httpd_uri_t index_uri = {
         .uri = "/",
@@ -786,12 +732,6 @@ void startCameraServer()
         .handler = stream_handler,
         .user_ctx = NULL};
 
-    httpd_uri_t list_dir_uri = {
-        .uri = "/list",
-        .method = HTTP_GET,
-        .handler = list_handler,
-        .user_ctx = NULL};
-
     httpd_uri_t file_download_uri = {
         .uri = "/open", // Match all URIs of type /path/to/file
         .method = HTTP_GET,
@@ -821,7 +761,6 @@ void startCameraServer()
         httpd_register_uri_handler(camera_httpd, &file_download);
         httpd_register_uri_handler(camera_httpd, &status_uri);
         httpd_register_uri_handler(camera_httpd, &capture_uri);
-        httpd_register_uri_handler(camera_httpd, &list_dir_uri);
         httpd_register_uri_handler(camera_httpd, &file_download_uri);
         httpd_register_uri_handler(camera_httpd, &file_lista_uri);
         httpd_register_uri_handler(camera_httpd, &file_image_uri);
