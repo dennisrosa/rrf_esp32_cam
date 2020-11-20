@@ -7,6 +7,7 @@
 #include <dl_lib_matrix3d.h>
 #include <file_utils.h>
 #include <ArduinoJson.h>
+#include <StreamUtils.h>
 
 #include <stdio.h>
 #include <string.h>
@@ -442,14 +443,16 @@ String listDirectories(File dir)
             break;
         }
 
-        // Recurse for directories, otherwise print the file size
         if (entry.isDirectory())
         {
             response += String("<a href=/open?path=") + String(entry.name()) + String(">") + String(entry.name()) + String("</a>") + String("</br>");
         }
         else
-        {
-            response += String(entry.name()) + String("</br>");
+        {   
+            Serial.println(String(entry.name()));
+            //if (entry.name() != null){
+                response += String(entry.name()) + String("</br>");
+            //}
         }
         Serial.println("antes close");
         entry.close();
@@ -584,7 +587,7 @@ static char *retrivePathfromRequest(httpd_req_t *req)
 static esp_err_t lista_handler(httpd_req_t *req)
 {
 
-    DynamicJsonDocument root(1024);
+    DynamicJsonDocument root(2048);
     JsonArray data = root.createNestedArray("path");
     String path = retrivePathfromRequest(req);
     path = path.substring(5, path.length());
@@ -592,6 +595,15 @@ static esp_err_t lista_handler(httpd_req_t *req)
 
     File f = SD_MMC.open(path, "r");
     f.rewindDirectory();
+
+
+    char dados[1000];
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
+
+    String virgula = " ,";
+    String json = "{\"path\":[";
+    httpd_resp_send_chunk(req, json.c_str(), json.length());
 
     while (true)
     {
@@ -604,27 +616,44 @@ static esp_err_t lista_handler(httpd_req_t *req)
         }
         String name = String(entry.name());
 
-        if( name != "/config.txt" && name != "/.Spotlight-V100"){
+
+        Serial.println(name + " - " + name.substring(0,2));
+        if( name != "/config.txt" &&  name.substring(0,2) != "/."  ){
+            root.clear();
             JsonObject obj = data.createNestedObject();
             obj["path"] = name;
             obj["directory"] = String(entry.isDirectory());
+
+           
+            serializeJson(obj, dados);
+            Serial.println(dados);
+            httpd_resp_send_chunk(req, dados, strlen(dados) );
+
+            httpd_resp_send_chunk(req, virgula.c_str(), virgula.length());
+
         }
         entry.close();
     }
 
-    char dados[1000];
-    serializeJson(root, dados);
-    httpd_resp_set_type(req, "application/json");
-    httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
-    httpd_resp_send(req, dados, strlen(dados));
+    json = "{ \"path\": null} ]}";
+    httpd_resp_send_chunk(req, json.c_str(), json.length());
+    httpd_resp_send_chunk(req, NULL, 0);
+
     return ESP_OK;
 }
 
 static esp_err_t image_handler(httpd_req_t *req)
 {
-
+    Serial.println("download image ");
     String path = retrivePathfromRequest(req);
+    Serial.println(path);
     path = path.substring(5, path.length());
+    int index = path.indexOf("&");
+    Serial.println(path);
+    Serial.println(index);
+    if(index > 0){
+        path = path.substring(0, index-1);
+    }
     Serial.println(path);
 
     File f = SD_MMC.open(path, "r");
@@ -672,6 +701,12 @@ static esp_err_t download_get_handler(httpd_req_t *req)
     String path = retrivePathfromRequest(req);
     path = path.substring(5, path.length());
     Serial.println(path);
+    int index = path.indexOf("&");
+    Serial.println(index);
+    if(index > 0){
+        path = path.substring(0, index);
+    }
+    Serial.println(path);    
 
     fd = SD_MMC.open(path.c_str(), "r");
     if (!fd)
@@ -715,7 +750,7 @@ void startCameraServer()
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
 
     httpd_uri_t file_download = {
-        .uri = "/xupa", // Match all URIs of type /path/to/file
+        .uri = "/image", // Match all URIs of type /path/to/file
         .method = HTTP_GET,
         .handler = download_get_handler,
         .user_ctx = NULL // Pass server data as context
