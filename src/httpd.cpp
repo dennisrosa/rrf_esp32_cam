@@ -460,59 +460,6 @@ static const char *get_path_from_uri(char *dest, const char *base_path, const ch
     return dest + base_pathlen;
 }
 
-esp_err_t get_handler(httpd_req_t *req)
-{
-
-    Serial.println("get handler");
-    size_t filename_len = httpd_req_get_url_query_len(req);
-    Serial.println("" + String(filename_len));
-
-    if (filename_len == 0)
-    {
-        char *resp_str = "Please specify a filename. eg. file?somefile.txt";
-        httpd_resp_send(req, resp_str, strlen(resp_str));
-        return ESP_OK;
-    }
-
-    char variable[128] = {
-        0,
-    };
-    char *buf;
-    size_t buf_len;
-    buf_len = httpd_req_get_url_query_len(req) + 1;
-    if (buf_len > 1)
-    {
-        buf = (char *)malloc(buf_len);
-        if (httpd_req_get_url_query_str(req, buf, buf_len) == ESP_OK)
-        {
-            Serial.println("***********");
-            Serial.println("path");
-            if (httpd_query_key_value(buf, "path", variable, sizeof(variable)) == ESP_OK)
-            {
-                Serial.println(variable);
-            }
-
-            Serial.println(buf);
-            Serial.println("***********");
-
-            //listDir(SD_MMC, "/" , 0
-            File f = SD_MMC.open(variable, "r");
-            Serial.println(f);
-
-            httpd_resp_set_type(req, "text/html");
-            String list = listDirectories(f);
-            const char *dados = list.c_str();
-
-            Serial.println("tamanho:" + strlen(dados));
-
-            free(buf);
-            httpd_resp_send(req, dados, strlen(dados));
-        }
-        free(buf);
-    }
-    return ESP_OK;
-}
-
 static char *retrivePathfromRequest(httpd_req_t *req)
 {
     char *buf;
@@ -586,57 +533,6 @@ static esp_err_t lista_handler(httpd_req_t *req)
     httpd_resp_send_chunk(req, json.c_str(), json.length());
     httpd_resp_send_chunk(req, NULL, 0);
 
-    return ESP_OK;
-}
-
-static esp_err_t image_handler(httpd_req_t *req)
-{
-    Serial.println("download image ");
-    String path = retrivePathfromRequest(req);
-    Serial.println(path);
-    path = path.substring(5, path.length());
-    int index = path.indexOf("&");
-    Serial.println(path);
-    Serial.println(index);
-    if(index > 0){
-        path = path.substring(0, index-1);
-    }
-    Serial.println(path);
-
-    File f = SD_MMC.open(path, "r");
-
-    if (f)
-    {
-        Serial.println("file found");
-        int filesize = f.size();
-        Serial.println("size:" + String(filesize));
-        httpd_resp_set_type(req, "image/jpeg");
-        httpd_resp_set_hdr(req, "Access-Control-Allow-Origin", "*");
-        String header = "inline; filename=" + path;
-        httpd_resp_set_hdr(req, "Content-Disposition", header.c_str());
-        httpd_resp_set_hdr(req, "Content-Length:", (const char *)filesize);
-        httpd_resp_set_type(req, "image/jpeg");
-        Serial.println("file read - start");
-
-        char buf[1024] = {'\0'};
-        int siz = f.size();
-        Serial.println("size:" + String(siz));
-
-        uint16_t i = 0;
-        while (f.available())
-        {
-            buf[i] = f.read();
-            Serial.println("file read.");
-            httpd_resp_send_chunk(req, (const char *)buf, sizeof(buf));
-            i++;
-        }
-
-        f.close();
-    }
-
-    Serial.println("file read - end");
-    httpd_resp_send_chunk(req, NULL, 0);
-    f.close();
     return ESP_OK;
 }
 
@@ -732,24 +628,10 @@ void startCameraServer()
         .handler = stream_handler,
         .user_ctx = NULL};
 
-    httpd_uri_t file_download_uri = {
-        .uri = "/open", // Match all URIs of type /path/to/file
-        .method = HTTP_GET,
-        .handler = get_handler,
-        .user_ctx = NULL // Pass server data as context
-    };
-
     httpd_uri_t file_lista_uri = {
         .uri = "/lista",
         .method = HTTP_GET,
         .handler = lista_handler,
-        .user_ctx = NULL // Pass server data as context
-    };
-
-    httpd_uri_t file_image_uri = {
-        .uri = "/img",
-        .method = HTTP_GET,
-        .handler = image_handler,
         .user_ctx = NULL // Pass server data as context
     };
 
@@ -761,9 +643,7 @@ void startCameraServer()
         httpd_register_uri_handler(camera_httpd, &file_download);
         httpd_register_uri_handler(camera_httpd, &status_uri);
         httpd_register_uri_handler(camera_httpd, &capture_uri);
-        httpd_register_uri_handler(camera_httpd, &file_download_uri);
         httpd_register_uri_handler(camera_httpd, &file_lista_uri);
-        httpd_register_uri_handler(camera_httpd, &file_image_uri);
     }
 
     config.server_port += 1;
