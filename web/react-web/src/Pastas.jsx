@@ -24,7 +24,7 @@ export default class Pastas extends Component {
                 this.setState({ loaded: this.imagesLoaded() })
             }
              
-        }, 30000)
+        }, 5000)
     }
 
     listar(path) {
@@ -35,7 +35,13 @@ export default class Pastas extends Component {
         fetch(url)
             .then(res => res.json())
             .then((data) => {
-                this.setState({ images: Array.from(data.path) });
+
+                var images  = Array.from(data.path);
+                console.log(images);
+                var filtered = images.filter(function(value, index, arr){ return value.path != null });
+                console.log(filtered);
+
+                this.setState({ images: filtered });
                 console.log("contatcts", this.state.images);
             })
             .catch(console.log)
@@ -78,11 +84,11 @@ export default class Pastas extends Component {
       }
 
     onFallbackImage(ev){
-        console.log("fallback image"  +ev.target.src );
+        console.log("fallback image: "  +ev.target.src );
 
         var n = ev.target.src.search("&a");
         if (n > 0 ){
-            ev.target.src = ev.target.src.substr(1,n-1);
+            ev.target.src = ev.target.src.substr(0,n);
         }else {
             ev.target.src = ev.target.src + "&a=" + Date.now();
         }
