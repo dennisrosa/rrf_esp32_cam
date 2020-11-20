@@ -2,19 +2,17 @@ import React, { Component } from 'react'
 
 export default class Diretorio extends Component {
 
-
-    endpoint = "/lista";
-    path = "";
-
+    endpoint = "http://192.168.1.70/lista?path=/";
     state = {
         contacts: []
     }
     
-    listar(path) {
-        this.path = path;
-        fetch(this.endpoint, { mode: "no-cors" })
+    listar() {
+        console.log(this.endpoint);
+        fetch(this.endpoint)
             .then(res => res.json())
             .then((data) => {
+                console.log("res data", data);
                 this.setState({ contacts: Array.from(data.path) })
             })
             .catch(console.log)
@@ -22,7 +20,7 @@ export default class Diretorio extends Component {
 
 
     componentDidMount() {
-        this.listar("/");
+        this.listar();
     }
 
     render() {
@@ -30,11 +28,10 @@ export default class Diretorio extends Component {
             <div>
                 <div className="Diretorio" >
                     <h1>Diretorios {this.props.path} </h1>
-                    <button onClick={() => this.props.alteraNome('Dennis Rosa')}> Muda PAth</button>
                     <ul>
                         {this.state.contacts.map((c) => (
                             <li key={c.path} >
-                                {c.directory === '1' ? <a href="#" onClick={() => this.listar(c.path)}>{c.path}</a> : c.path}
+                                {c.directory === '1' ? <a  onClick={() => {this.props.onChangePath(c.path)} }>{c.path}</a> : c.path}
                             </li>
                         ))}
                     </ul>
@@ -43,7 +40,6 @@ export default class Diretorio extends Component {
             </div>
         )
     }    
-
 
 }
 
